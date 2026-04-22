@@ -7,7 +7,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 700px;
+      max-width: 800px;
       margin: 40px auto;
       padding: 0 16px;
       background: #f7f7fb;
@@ -20,29 +20,78 @@
 
     p {
       color: #444;
+      margin-bottom: 20px;
+    }
+
+    #chat {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .user {
+      align-self: flex-end;
+      background: #111;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bot {
+      align-self: flex-start;
+      background: #ececf3;
+      color: #111;
+      border-bottom-left-radius: 4px;
+    }
+
+    .system {
+      align-self: center;
+      background: #fff8d6;
+      color: #444;
+      font-size: 14px;
+      border: 1px solid #eadf9b;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
     }
 
     textarea {
-      width: 100%;
-      height: 120px;
+      flex: 1;
+      min-height: 70px;
+      max-height: 180px;
       padding: 12px;
       font-size: 16px;
       border: 1px solid #bbb;
-      border-radius: 10px;
+      border-radius: 12px;
       box-sizing: border-box;
       resize: vertical;
-      margin-top: 12px;
     }
 
     button {
-      margin-top: 12px;
       padding: 12px 18px;
       font-size: 16px;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
       background: #111;
       color: white;
+      align-self: flex-end;
     }
 
     button:disabled {
@@ -50,57 +99,54 @@
       cursor: not-allowed;
     }
 
-    .box {
-      margin-top: 18px;
-      padding: 14px;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .label {
-      font-weight: bold;
-      margin-bottom: 6px;
+    .status {
+      margin-top: 12px;
+      color: #555;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
   <h1>Jetson Chat Demo</h1>
-  <p>This version sends your message to a demo API. Later, we can swap in the Jetson.</p>
+  <p>This version uses a demo API. Later, we’ll swap in the Jetson as the real backend.</p>
 
-  <textarea id="prompt" placeholder="Type a message here..."></textarea>
-  <br />
-  <button id="sendBtn">Send</button>
-
-  <div class="box">
-    <div class="label">Status</div>
-    <div id="status">Idle</div>
+  <div id="chat">
+    <div class="message system">Chat ready. Send a message to test the website-to-API flow.</div>
   </div>
 
-  <div class="box">
-    <div class="label">API Response</div>
-    <div id="response">Nothing yet.</div>
+  <div class="input-row">
+    <textarea id="prompt" placeholder="Type a message here..."></textarea>
+    <button id="sendBtn">Send</button>
   </div>
+
+  <div class="status" id="status">Status: Idle</div>
 
   <script>
+    const chat = document.getElementById("chat");
     const sendBtn = document.getElementById("sendBtn");
     const promptBox = document.getElementById("prompt");
     const statusBox = document.getElementById("status");
-    const responseBox = document.getElementById("response");
 
-    sendBtn.addEventListener("click", async () => {
+    function addMessage(text, type) {
+      const msg = document.createElement("div");
+      msg.className = `message ${type}`;
+      msg.textContent = text;
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function sendMessage() {
       const prompt = promptBox.value.trim();
 
       if (!prompt) {
-        statusBox.textContent = "Please type a message first.";
+        statusBox.textContent = "Status: Please type a message first.";
         return;
       }
 
+      addMessage(prompt, "user");
+      promptBox.value = "";
       sendBtn.disabled = true;
-      statusBox.textContent = "Sending request...";
-      responseBox.textContent = "";
+      statusBox.textContent = "Status: Sending request...";
 
       try {
         const res = await fetch("https://echo.free.beeceptor.com/chat-demo", {
@@ -116,22 +162,31 @@
 
         const data = await res.json();
 
-        statusBox.textContent = `Success (${res.status})`;
-
         const echoedMessage =
           data?.parsedBody?.message ??
           data?.message ??
           "No echoed message field found.";
 
-        responseBox.textContent =
-          "You said: " + prompt + "\n\n" +
-          "Demo API received: " + echoedMessage + "\n\n" +
-          "This is where the Jetson reply will go later.";
+        addMessage(
+          "Demo API received: " + echoedMessage + "\n\nThis is where the Jetson reply will go later.",
+          "bot"
+        );
+
+        statusBox.textContent = `Status: Success (${res.status})`;
       } catch (err) {
-        statusBox.textContent = "Request failed.";
-        responseBox.textContent = String(err);
+        addMessage("Request failed: " + String(err), "bot");
+        statusBox.textContent = "Status: Request failed.";
       } finally {
         sendBtn.disabled = false;
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+
+    promptBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
       }
     });
   </script>
