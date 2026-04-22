@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jetson Chat Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #f7f7fb;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #444;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #bbb;
+      border-radius: 10px;
+      box-sizing: border-box;
+      resize: vertical;
+      margin-top: 12px;
+    }
+
+    button {
+      margin-top: 12px;
+      padding: 12px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #111;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .box {
+      margin-top: 18px;
+      padding: 14px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .label {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jetson Chat Demo</h1>
+  <p>This version sends your message to a demo API. Later, we can swap in the Jetson.</p>
+
+  <textarea id="prompt" placeholder="Type a message here..."></textarea>
+  <br />
+  <button id="sendBtn">Send</button>
+
+  <div class="box">
+    <div class="label">Status</div>
+    <div id="status">Idle</div>
+  </div>
+
+  <div class="box">
+    <div class="label">API Response</div>
+    <div id="response">Nothing yet.</div>
+  </div>
+
+  <script>
+    const sendBtn = document.getElementById("sendBtn");
+    const promptBox = document.getElementById("prompt");
+    const statusBox = document.getElementById("status");
+    const responseBox = document.getElementById("response");
+
+    sendBtn.addEventListener("click", async () => {
+      const prompt = promptBox.value.trim();
+
+      if (!prompt) {
+        statusBox.textContent = "Please type a message first.";
+        return;
+      }
+
+      sendBtn.disabled = true;
+      statusBox.textContent = "Sending request...";
+      responseBox.textContent = "";
+
+      try {
+        const res = await fetch("https://echo.free.beeceptor.com/chat-demo", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: prompt,
+            source: "github-pages-demo"
+          })
+        });
+
+        const data = await res.json();
+
+        statusBox.textContent = `Success (${res.status})`;
+
+        // Show both a friendly line and the raw JSON.
+        const echoedMessage =
+          data?.parsedBody?.message ??
+          data?.message ??
+          "No echoed message field found.";
+
+        responseBox.textContent =
+          "Echoed message: " + echoedMessage + "\n\nRaw JSON:\n" +
+          JSON.stringify(data, null, 2);
+      } catch (err) {
+        statusBox.textContent = "Request failed.";
+        responseBox.textContent = String(err);
+      } finally {
+        sendBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
