@@ -118,15 +118,15 @@
 
         statusBox.textContent = `Success (${res.status})`;
 
-        // Show both a friendly line and the raw JSON.
         const echoedMessage =
           data?.parsedBody?.message ??
           data?.message ??
           "No echoed message field found.";
 
         responseBox.textContent =
-          "Echoed message: " + echoedMessage + "\n\nRaw JSON:\n" +
-          JSON.stringify(data, null, 2);
+          "You said: " + prompt + "\n\n" +
+          "Demo API received: " + echoedMessage + "\n\n" +
+          "This is where the Jetson reply will go later.";
       } catch (err) {
         statusBox.textContent = "Request failed.";
         responseBox.textContent = String(err);
