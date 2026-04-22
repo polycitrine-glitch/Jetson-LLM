@@ -178,12 +178,12 @@
   <div class="page">
     <div class="header">
       <h1>Jetson Chat Demo</h1>
-      <p>This version uses a demo API. Later, we’ll swap in the Jetson as the real backend.</p>
+      <p>This version talks to DeepSeek running locally on your Mac through Ollama.</p>
     </div>
 
     <div id="chat-wrap">
       <div id="chat">
-        <div class="message system">Chat ready. Send a message to test the website-to-API flow.</div>
+        <div class="message system">Chat ready. Send a message to test your Mac running DeepSeek locally.</div>
       </div>
     </div>
 
@@ -247,26 +247,22 @@
       scrollToBottom(true);
 
       try {
-        const res = await fetch("https://echo.free.beeceptor.com/chat-demo", {
+        const res = await fetch("http://127.0.0.1:11434/api/generate", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            message: prompt,
-            source: "github-pages-demo"
+            model: "deepseek-r1:1.5b",
+            prompt: prompt,
+            stream: false
           })
         });
 
         const data = await res.json();
 
-        const echoedMessage =
-          data?.parsedBody?.message ??
-          data?.message ??
-          "No echoed message field found.";
-
         addMessage(
-          "Demo API received: " + echoedMessage + "\n\nThis is where the Jetson reply will go later.",
+          data?.response ?? "No response came back from Ollama.",
           "bot"
         );
 
