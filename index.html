@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Jetson Chat Demo</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -34,17 +32,39 @@
       max-width: 800px;
       width: 100%;
       margin: 0 auto;
-      padding: 24px 16px 12px 16px;
+      padding: 24px 16px 12px;
       background: #f7f7fb;
     }
 
-    h1 {
-      margin: 0 0 8px 0;
+    h1 { margin: 0 0 8px 0; }
+    p { margin: 0; color: #444; }
+
+    #loginBox {
+      max-width: 800px;
+      margin: 12px auto;
+      padding: 0 16px;
     }
 
-    p {
-      margin: 0;
-      color: #444;
+    .login-card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    }
+
+    .login-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #bbb;
+      border-radius: 12px;
+      font-family: inherit;
     }
 
     #chat-wrap {
@@ -63,8 +83,21 @@
       gap: 12px;
     }
 
-    .message {
+    .message-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
       max-width: 75%;
+    }
+
+    .user-wrap { align-self: flex-end; }
+    .bot-wrap { align-self: flex-start; }
+    .system-wrap {
+      align-self: center;
+      max-width: 90%;
+    }
+
+    .message {
       padding: 12px 14px;
       border-radius: 14px;
       white-space: pre-wrap;
@@ -73,26 +106,28 @@
     }
 
     .user {
-      align-self: flex-end;
       background: #111;
       color: white;
       border-bottom-right-radius: 4px;
     }
 
     .bot {
-      align-self: flex-start;
       background: #ececf3;
       color: #111;
       border-bottom-left-radius: 4px;
     }
 
     .system {
-      align-self: center;
       background: #fff8d6;
       color: #444;
       font-size: 14px;
       border: 1px solid #eadf9b;
-      max-width: 90%;
+    }
+
+    .message-note {
+      font-size: 12px;
+      color: #888;
+      padding: 0 4px;
     }
 
     .composer-shell {
@@ -100,7 +135,7 @@
       bottom: 0;
       width: 100%;
       background: linear-gradient(to top, #f7f7fb 75%, rgba(247, 247, 251, 0));
-      padding: 12px 0 16px 0;
+      padding: 12px 0 16px;
     }
 
     .composer {
@@ -151,25 +186,40 @@
       cursor: not-allowed;
     }
 
-    .status {
+    .secondary-btn {
+      background: #ddd;
+      color: #111;
+      font-size: 14px;
+      padding: 8px 12px;
+    }
+
+    .status-row {
       margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status {
       color: #555;
       font-size: 14px;
       padding-left: 2px;
     }
 
     @media (max-width: 700px) {
-      .message {
-        max-width: 88%;
-      }
+      .message-wrap { max-width: 88%; }
 
-      .input-row {
+      .input-row, .login-row {
         flex-direction: column;
         align-items: stretch;
       }
 
-      button {
-        width: 100%;
+      button { width: 100%; }
+
+      .status-row {
+        flex-direction: column;
+        align-items: stretch;
       }
     }
   </style>
@@ -178,34 +228,88 @@
   <div class="page">
     <div class="header">
       <h1>Jetson Chat Demo</h1>
-      <p>This version talks to DeepSeek running locally on your Mac through Ollama.</p>
+      <p>This site talks to Llama 3.1 8B running on your Jetson through a password-protected proxy.</p>
+    </div>
+
+    <div id="loginBox">
+      <div class="login-card">
+        <div class="login-row">
+          <input id="passwordInput" type="password" placeholder="Enter Jetson password..." />
+          <button id="loginBtn">Unlock</button>
+        </div>
+        <div class="status" id="loginStatus">Not logged in.</div>
+      </div>
     </div>
 
     <div id="chat-wrap">
-      <div id="chat">
-        <div class="message system">Chat ready. Send a message to test your Mac running DeepSeek locally.</div>
-      </div>
+      <div id="chat"></div>
     </div>
 
     <div class="composer-shell">
       <div class="composer">
         <div class="composer-box">
           <div class="input-row">
-            <textarea id="prompt" placeholder="Type a message here..."></textarea>
-            <button id="sendBtn">Send</button>
+            <textarea id="prompt" placeholder="Type a message here..." disabled></textarea>
+            <button id="sendBtn" disabled>Send</button>
           </div>
-          <div class="status" id="status">Status: Idle</div>
+
+          <div class="status-row">
+            <div class="status" id="status">Status: Locked</div>
+            <button class="secondary-btn" id="clearBtn" type="button">Clear Chat</button>
+            <button class="secondary-btn" id="logoutBtn" type="button">Logout</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
+    const API_BASE = "https://forbes-truly-lease-school.trycloudflare.com";
+    const MODEL = "llama3.1:8b";
+
     const chatWrap = document.getElementById("chat-wrap");
     const chat = document.getElementById("chat");
     const sendBtn = document.getElementById("sendBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
     const promptBox = document.getElementById("prompt");
     const statusBox = document.getElementById("status");
+
+    const passwordInput = document.getElementById("passwordInput");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginStatus = document.getElementById("loginStatus");
+
+    const systemPrompt =
+      "You are a helpful chatbot running locally on a Jetson. " +
+      "Always reply in English. Use plain text only. Be concise and natural.";
+
+    const conversationHistory = [];
+
+    function getToken() {
+      return localStorage.getItem("jetson_token") || "";
+    }
+
+    function setToken(token) {
+      localStorage.setItem("jetson_token", token);
+    }
+
+    function clearToken() {
+      localStorage.removeItem("jetson_token");
+    }
+
+    function setUnlocked(isUnlocked) {
+      promptBox.disabled = !isUnlocked;
+      sendBtn.disabled = !isUnlocked;
+
+      if (isUnlocked) {
+        loginStatus.textContent = "Logged in.";
+        statusBox.textContent = "Status: Ready";
+        promptBox.focus();
+      } else {
+        loginStatus.textContent = "Not logged in.";
+        statusBox.textContent = "Status: Locked";
+      }
+    }
 
     function isNearBottom() {
       const threshold = 120;
@@ -218,20 +322,89 @@
       }
     }
 
-    function addMessage(text, type) {
+    function addMessage(text, type, note = "") {
       const shouldStick = isNearBottom();
+
+      const wrap = document.createElement("div");
+      wrap.className = `message-wrap ${type}-wrap`;
 
       const msg = document.createElement("div");
       msg.className = `message ${type}`;
       msg.textContent = text;
-      chat.appendChild(msg);
+      wrap.appendChild(msg);
 
-      if (shouldStick) {
-        scrollToBottom(true);
+      if (note) {
+        const noteEl = document.createElement("div");
+        noteEl.className = "message-note";
+        noteEl.textContent = note;
+        wrap.appendChild(noteEl);
+      }
+
+      chat.appendChild(wrap);
+
+      if (shouldStick) scrollToBottom(true);
+    }
+
+    function clearChat() {
+      chat.innerHTML = "";
+      conversationHistory.length = 0;
+      addMessage("Chat cleared.", "system");
+      addMessage("Chat ready. This is using your Jetson through the secure proxy.", "system");
+      statusBox.textContent = getToken() ? "Status: Ready" : "Status: Locked";
+      promptBox.focus();
+    }
+
+    async function login() {
+      const password = passwordInput.value.trim();
+
+      if (!password) {
+        loginStatus.textContent = "Enter the password first.";
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginStatus.textContent = "Checking password...";
+
+      try {
+        const res = await fetch(`${API_BASE}/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.ok || !data.token) {
+          loginStatus.textContent = data.error || "Login failed.";
+          clearToken();
+          setUnlocked(false);
+          return;
+        }
+
+        setToken(data.token);
+        passwordInput.value = "";
+        setUnlocked(true);
+        addMessage("Unlocked Jetson access for this browser.", "system");
+      } catch (err) {
+        loginStatus.textContent = "Login request failed: " + String(err);
+        clearToken();
+        setUnlocked(false);
+      } finally {
+        loginBtn.disabled = false;
       }
     }
 
     async function sendMessage() {
+      const token = getToken();
+
+      if (!token) {
+        statusBox.textContent = "Status: Log in first.";
+        setUnlocked(false);
+        return;
+      }
+
       const prompt = promptBox.value.trim();
 
       if (!prompt) {
@@ -240,43 +413,84 @@
       }
 
       addMessage(prompt, "user");
+      conversationHistory.push({
+        role: "user",
+        content: prompt
+      });
+
       promptBox.value = "";
       sendBtn.disabled = true;
-      statusBox.textContent = "Status: Sending request...";
-
+      statusBox.textContent = "Status: Thinking...";
       scrollToBottom(true);
 
       try {
-        const res = await fetch("http://127.0.0.1:11434/api/generate", {
+        const res = await fetch(`${API_BASE}/chat`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({
-            model: "deepseek-r1:1.5b",
-            prompt: prompt,
-            stream: false
+            model: MODEL,
+            stream: false,
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
+              },
+              ...conversationHistory
+            ]
           })
         });
 
         const data = await res.json();
 
-        addMessage(
-          data?.response ?? "No response came back from Ollama.",
-          "bot"
-        );
+        if (res.status === 401 || res.status === 403) {
+          clearToken();
+          setUnlocked(false);
+          addMessage("Session expired or token rejected. Log in again.", "system");
+          return;
+        }
+
+        if (!res.ok) {
+          addMessage("Request failed: " + JSON.stringify(data), "bot");
+          statusBox.textContent = `Status: Error (${res.status})`;
+          return;
+        }
+
+        const rawReply = data?.message?.content ?? "";
+        const reply = rawReply.trim() || "(No answer)";
+
+        addMessage(reply, "bot");
+        conversationHistory.push({
+          role: "assistant",
+          content: reply
+        });
 
         statusBox.textContent = `Status: Success (${res.status})`;
       } catch (err) {
         addMessage("Request failed: " + String(err), "bot");
         statusBox.textContent = "Status: Request failed.";
       } finally {
-        sendBtn.disabled = false;
+        sendBtn.disabled = !getToken();
         promptBox.focus();
       }
     }
 
+    function logout() {
+      clearToken();
+      setUnlocked(false);
+      addMessage("Logged out from Jetson access.", "system");
+    }
+
+    loginBtn.addEventListener("click", login);
     sendBtn.addEventListener("click", sendMessage);
+    clearBtn.addEventListener("click", clearChat);
+    logoutBtn.addEventListener("click", logout);
+
+    passwordInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") login();
+    });
 
     promptBox.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey) {
@@ -286,6 +500,8 @@
     });
 
     window.addEventListener("load", () => {
+      clearChat();
+      setUnlocked(Boolean(getToken()));
       scrollToBottom(true);
     });
   </script>
